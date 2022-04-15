@@ -97,16 +97,27 @@ public class BrokerStartup {
             if (null == commandLine) {
                 System.exit(-1);
             }
-
+            /*
+                Broker核心配置类
+                broker配置、netty服务器配置、netty客户端配置
+             */
             final BrokerConfig brokerConfig = new BrokerConfig();
             final NettyServerConfig nettyServerConfig = new NettyServerConfig();
             final NettyClientConfig nettyClientConfig = new NettyClientConfig();
 
+            /*
+                设置Netty客户端 是否使用TLS配置(加密机制)
+             */
             nettyClientConfig.setUseTLS(Boolean.parseBoolean(System.getProperty(TLS_ENABLE,
                 String.valueOf(TlsSystemConfig.tlsMode == TlsMode.ENFORCING))));
+            //设置了监听端口号
             nettyServerConfig.setListenPort(10911);
+            //Broker用来存储消息的配置
             final MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
 
+            /*
+                如果Broker是slave的话，那么这里需要设置一个特殊的参数
+             */
             if (BrokerRole.SLAVE == messageStoreConfig.getBrokerRole()) {
                 int ratio = messageStoreConfig.getAccessMessageInMemoryMaxRatio() - 10;
                 messageStoreConfig.setAccessMessageInMemoryMaxRatio(ratio);
@@ -130,14 +141,14 @@ public class BrokerStartup {
                     in.close();
                 }
             }
-
+            //放在命令行里的参数，解析到Broker中
             MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), brokerConfig);
-
+            //检查环境变量
             if (null == brokerConfig.getRocketmqHome()) {
                 System.out.printf("Please set the %s variable in your environment to match the location of the RocketMQ installation", MixAll.ROCKETMQ_HOME_ENV);
                 System.exit(-2);
             }
-
+            //读取NameServer的地址列表
             String namesrvAddr = brokerConfig.getNamesrvAddr();
             if (null != namesrvAddr) {
                 try {
@@ -152,7 +163,7 @@ public class BrokerStartup {
                     System.exit(-3);
                 }
             }
-
+            //判断Broker角色，针对角色处理
             switch (messageStoreConfig.getBrokerRole()) {
                 case ASYNC_MASTER:
                 case SYNC_MASTER:
@@ -168,12 +179,15 @@ public class BrokerStartup {
                 default:
                     break;
             }
-
+            //判断是否基于dleger技术管理主从同步和CommitLog
             if (messageStoreConfig.isEnableDLegerCommitLog()) {
                 brokerConfig.setBrokerId(-1);
             }
 
+            //设置HA监听端口号
             messageStoreConfig.setHaListenPort(nettyServerConfig.getListenPort() + 1);
+
+            //日志相关
             LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
             JoranConfigurator configurator = new JoranConfigurator();
             configurator.setContext(lc);
@@ -217,12 +231,14 @@ public class BrokerStartup {
             // remember all configs to prevent discard
             controller.getConfiguration().registerConfig(properties);
 
+            //controller的初始化
             boolean initResult = controller.initialize();
             if (!initResult) {
                 controller.shutdown();
                 System.exit(-3);
             }
 
+            //注册JVM关闭的钩子函数，JVM退出的时候会进行资源释放
             Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
                 private volatile boolean hasShutdown = false;
                 private AtomicInteger shutdownTimes = new AtomicInteger(0);
