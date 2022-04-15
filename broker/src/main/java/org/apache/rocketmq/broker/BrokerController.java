@@ -909,10 +909,12 @@ public class BrokerController {
     }
 
     public void start() throws Exception {
+        //启动核心的消息存储组件
         if (this.messageStore != null) {
             this.messageStore.start();
         }
 
+        //启动Netty服务器
         if (this.remotingServer != null) {
             this.remotingServer.start();
         }
@@ -921,14 +923,17 @@ public class BrokerController {
             this.fastRemotingServer.start();
         }
 
+        //启动文件相关的组件
         if (this.fileWatchService != null) {
             this.fileWatchService.start();
         }
 
+        //让Broker听过Netty听过客户端去发送请求给别人，比如注册和心跳
         if (this.brokerOuterAPI != null) {
             this.brokerOuterAPI.start();
         }
 
+        //功能组件
         if (this.pullRequestHoldService != null) {
             this.pullRequestHoldService.start();
         }
@@ -947,6 +952,7 @@ public class BrokerController {
             this.registerBrokerAll(true, false, true);
         }
 
+        //往线程池提交了一个任务，去NameServer进行注册
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
