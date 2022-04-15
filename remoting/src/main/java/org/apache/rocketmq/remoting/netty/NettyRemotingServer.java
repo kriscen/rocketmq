@@ -196,6 +196,9 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
 
         prepareSharableHandlers();
 
+        /*
+            基于Netty的API去配置和启动一个Netty的网络服务器
+         */
         ServerBootstrap childHandler =
             this.serverBootstrap.group(this.eventLoopGroupBoss, this.eventLoopGroupSelector)
                 .channel(useEpoll() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
@@ -204,11 +207,22 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                 .option(ChannelOption.SO_KEEPALIVE, false)
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .localAddress(new InetSocketAddress(this.nettyServerConfig.getListenPort()))
+                /*
+                    基于ServerBootstrap的group方法，对Netty服务器进行网络配置
+                    只要Netty服务器收到一个请求，那么会依次使用下面的处理器处理请求
+                    handShakeHandler:负责连接握手
+                    NettyDecoder:负责编码解码
+                    IdleStateHandler:负责连接空闲管理
+                    connectionManageHandler:负责网络连接管理
+                    serverHandler:负责网络请求的处理
+                 */
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
                         ch.pipeline()
-                            .addLast(defaultEventExecutorGroup, HANDSHAKE_HANDLER_NAME, handshakeHandler)
+                            .addLast(defaultEventExecutorGroup,
+                                    HANDSHAKE_HANDLER_NAME,
+                                    handshakeHandler)
                             .addLast(defaultEventExecutorGroup,
                                 encoder,
                                 new NettyDecoder(),
@@ -238,6 +252,10 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         }
 
         try {
+            /*
+                启动Netty服务器
+                band方法就是绑定和监听一个端口号
+             */
             ChannelFuture sync = this.serverBootstrap.bind().sync();
             InetSocketAddress addr = (InetSocketAddress) sync.channel().localAddress();
             this.port = addr.getPort();

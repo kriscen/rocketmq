@@ -82,12 +82,14 @@ public class NamesrvStartup {
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
         nettyServerConfig.setListenPort(9876);
+        //命令启动的时候用-c带上了配置文件地址，就会读取配置文件内容
         if (commandLine.hasOption('c')) {
             String file = commandLine.getOptionValue('c');
             if (file != null) {
                 InputStream in = new BufferedInputStream(new FileInputStream(file));
                 properties = new Properties();
                 properties.load(in);
+                //配置文件属性装载
                 MixAll.properties2Object(properties, namesrvConfig);
                 MixAll.properties2Object(properties, nettyServerConfig);
 
@@ -97,7 +99,10 @@ public class NamesrvStartup {
                 in.close();
             }
         }
-
+        /*
+            启动命令带了-p的选项
+            就会打印出配置信息
+         */
         if (commandLine.hasOption('p')) {
             InternalLogger console = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_CONSOLE_NAME);
             MixAll.printObjectProperties(console, namesrvConfig);
@@ -105,6 +110,7 @@ public class NamesrvStartup {
             System.exit(0);
         }
 
+        //将mqnamesrv命令行中的配置选项，都读取出来，覆盖NamesrvConfig
         MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), namesrvConfig);
 
         if (null == namesrvConfig.getRocketmqHome()) {
@@ -112,6 +118,7 @@ public class NamesrvStartup {
             System.exit(-2);
         }
 
+        //日志配置相关
         LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
         JoranConfigurator configurator = new JoranConfigurator();
         configurator.setContext(lc);
@@ -123,6 +130,7 @@ public class NamesrvStartup {
         MixAll.printObjectProperties(log, namesrvConfig);
         MixAll.printObjectProperties(log, nettyServerConfig);
 
+        //NamesrvController持有两个config对象
         final NamesrvController controller = new NamesrvController(namesrvConfig, nettyServerConfig);
 
         // remember all configs to prevent discard
@@ -136,9 +144,10 @@ public class NamesrvStartup {
         if (null == controller) {
             throw new IllegalArgumentException("NamesrvController is null");
         }
-
+        //初始化
         boolean initResult = controller.initialize();
         if (!initResult) {
+            //异常就关闭
             controller.shutdown();
             System.exit(-3);
         }
@@ -150,7 +159,7 @@ public class NamesrvStartup {
                 return null;
             }
         }));
-
+        //启动
         controller.start();
 
         return controller;

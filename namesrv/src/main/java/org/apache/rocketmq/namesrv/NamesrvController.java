@@ -74,16 +74,20 @@ public class NamesrvController {
     }
 
     public boolean initialize() {
-
+        //加载kv配置
         this.kvConfigManager.load();
-
+        //初始化netty配置
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
-
+        //remotingExecutor:netty的工作线程
         this.remotingExecutor =
             Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
-
+        //将工作线程池交给Netty服务器
         this.registerProcessor();
 
+        /*
+            启动一个后台线程，执行定时任务
+            scanNotActiveBroker：扫描没有发送心跳没活动的Broker
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -92,6 +96,10 @@ public class NamesrvController {
             }
         }, 5, 10, TimeUnit.SECONDS);
 
+        /*
+            启动后台线程执行第四任务
+            定时打印kv配置信息
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -100,6 +108,10 @@ public class NamesrvController {
             }
         }, 1, 10, TimeUnit.MINUTES);
 
+        /*
+            FileWatch相关
+            暂时跳过
+         */
         if (TlsSystemConfig.tlsMode != TlsMode.DISABLED) {
             // Register a listener to reload SslContext
             try {
