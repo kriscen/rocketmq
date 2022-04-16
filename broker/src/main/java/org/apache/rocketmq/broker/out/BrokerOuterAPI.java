@@ -175,7 +175,6 @@ public class BrokerOuterAPI {
         return registerBrokerResultList;
     }
 
-    //TODO 大量Netty代码，暂时忽略
     private RegisterBrokerResult registerBroker(
         final String namesrvAddr,
         final boolean oneway,
@@ -184,9 +183,11 @@ public class BrokerOuterAPI {
         final byte[] body
     ) throws RemotingCommandException, MQBrokerException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException,
         InterruptedException {
+        //封装请求
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.REGISTER_BROKER, requestHeader);
         request.setBody(body);
 
+        //oneway：不用等待注册结果
         if (oneway) {
             try {
                 this.remotingClient.invokeOneway(namesrvAddr, request, timeoutMills);
@@ -196,7 +197,10 @@ public class BrokerOuterAPI {
             return null;
         }
 
+        //真正发送网络请求的逻辑
         RemotingCommand response = this.remotingClient.invokeSync(namesrvAddr, request, timeoutMills);
+
+        //处理网络请求返回的结果解析岑response
         assert response != null;
         switch (response.getCode()) {
             case ResponseCode.SUCCESS: {
