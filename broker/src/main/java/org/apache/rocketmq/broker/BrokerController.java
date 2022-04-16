@@ -952,7 +952,11 @@ public class BrokerController {
             this.registerBrokerAll(true, false, true);
         }
 
-        //往线程池提交了一个任务，去NameServer进行注册
+        /*
+            往线程池提交了一个任务，去NameServer进行注册
+
+            第一次是注册，后面每隔30秒就又发送一次请求进行心跳续约
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override

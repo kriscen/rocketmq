@@ -112,18 +112,35 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                //加写锁，同一时间只能一个线程来执行
                 this.lock.writeLock().lockInterruptibly();
 
+                //根据clusterName获取一个set集合
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
                     this.clusterAddrTable.put(clusterName, brokerNames);
                 }
+                /*
+                    将brokerName扔到set集合里面
+                    这个维护一个集群里有哪些broker存在的一个set数据结构
+
+                    由于心跳和注册是一个请求，所以用set重复调用没有影响
+                 */
                 brokerNames.add(brokerName);
 
                 boolean registerFirst = false;
 
+                /*
+                    根据brokerName获取到BrokerData
+                    用一个brokerAddrTable作为核心路由数据表，存放了所有Broker的详细路由数据
+                 */
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
+                /*
+                    如果第一次是注册，就走这一步
+                    封装一个BrokerData，放入这个路由数据表里面
+                    Broker的注册过程就完成了
+                 */
                 if (null == brokerData) {
                     registerFirst = true;
                     brokerData = new BrokerData(clusterName, brokerName, new HashMap<Long, String>());
@@ -157,6 +174,13 @@ public class RouteInfoManager {
                     }
                 }
 
+                /*
+                    每隔30s，发送注册请求作为心跳的时候走这
+
+                    每隔30s，封装一个新的BrokerLiveInfo放入map，覆盖掉上一次的数据
+                    这个BrokerLiveInfo中含有当前时间戳，代表最近一次的心跳
+                    这个就是30s心跳的处理逻辑
+                 */
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
@@ -440,14 +464,20 @@ public class RouteInfoManager {
     }
 
     public void scanNotActiveBroker() {
+        /*
+            直接扫描BrokerLiveInfo的心跳数据结构
+            遍历比对心跳时间
+         */
         Iterator<Entry<String, BrokerLiveInfo>> it = this.brokerLiveTable.entrySet().iterator();
         while (it.hasNext()) {
             Entry<String, BrokerLiveInfo> next = it.next();
             long last = next.getValue().getLastUpdateTimestamp();
+            //如果上次心跳时间+心跳间隔(默认120s) 比 当前时间小，就认为过期了
             if ((last + BROKER_CHANNEL_EXPIRED_TIME) < System.currentTimeMillis()) {
                 RemotingUtil.closeChannel(next.getValue().getChannel());
                 it.remove();
                 log.warn("The broker channel expired, {} {}ms", next.getKey(), BROKER_CHANNEL_EXPIRED_TIME);
+                //将Broker从路由数据表中剔除
                 this.onChannelDestroy(next.getKey(), next.getValue().getChannel());
             }
         }
