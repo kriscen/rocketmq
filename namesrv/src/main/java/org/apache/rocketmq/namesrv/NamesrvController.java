@@ -159,7 +159,10 @@ public class NamesrvController {
             this.remotingServer.registerDefaultProcessor(new ClusterTestRequestProcessor(this, namesrvConfig.getProductEnvName()),
                 this.remotingExecutor);
         } else {
-
+            /*
+                把NameServer的默认处理请求组件注册进去
+                即NettyServer接收到的请求，会用这个组件处理
+             */
             this.remotingServer.registerDefaultProcessor(new DefaultRequestProcessor(this), this.remotingExecutor);
         }
     }
